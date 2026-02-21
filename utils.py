@@ -11,6 +11,12 @@ import math
 CAMERA_WINDOW = "Camera Window"
 APPLE_WINDOW  = "Apple Window"
 
+# Camera window forced size (width, height). Set to non-square to override
+# the raw camera frame size for the UI. Set to `None` to keep the camera's
+# native frame dimensions.
+CAMERA_WIN_W: int | None = 800
+CAMERA_WIN_H: int | None = 600
+
 # ─── Window Position & Movement ──────────────────────────────────────────────
 WIN_START_X = 50                 # Initial X for Camera Window
 WIN_GAP_FAR = 600                # Starting gap between windows

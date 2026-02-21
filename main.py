@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from utils import (
     CAMERA_WINDOW, APPLE_WINDOW, TARGET_FPS,
     WIN_START_X, WIN_GAP_FAR, WIN_GAP_MIN, WIN_MOVE_SPEED, WIN_DRAG_SENSITIVITY,
-    distance,
+    distance, CAMERA_WIN_W, CAMERA_WIN_H,
 )
 from hand_tracker import HandTracker
 from gesture_detector import GestureDetector
@@ -69,7 +69,17 @@ def main():
         cap.release()
         sys.exit(1)
 
-    cam_h, cam_w = test_frame.shape[:2]
+    # Determine target camera size: use configured size if provided,
+    # otherwise fall back to the native frame size.
+    native_h, native_w = test_frame.shape[:2]
+    cam_w = CAMERA_WIN_W if CAMERA_WIN_W is not None else native_w
+    cam_h = CAMERA_WIN_H if CAMERA_WIN_H is not None else native_h
+
+    # Resize the initial frame to the target camera size so UI elements
+    # (windows, renderer) use the desired aspect ratio.
+    if (cam_w, cam_h) != (native_w, native_h):
+        test_frame = cv2.resize(test_frame, (int(cam_w), int(cam_h)), interpolation=cv2.INTER_LINEAR)
+
     canvas_size = (cam_w, cam_h)
 
     # ── Initialise components ─────────────────────────────────────────
@@ -85,6 +95,7 @@ def main():
     apple_win_y   = 100.0
 
     cv2.namedWindow(CAMERA_WINDOW, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(CAMERA_WINDOW, int(cam_w), int(cam_h))
     cv2.moveWindow(CAMERA_WINDOW, int(current_cam_x), int(current_cam_y))
 
     apple_window_visible = True
