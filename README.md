@@ -65,3 +65,32 @@ A real-time computer vision application that allows you to control a virtual obj
 - `state_machine.py`: FSM enforcing valid interaction transitions.
 - `utils.py`: Shared constants and math helpers.
 - `assets/`: Contains the apple sprite.
+
+## 🔗 Share on LinkedIn
+
+If you'd like to share this project on LinkedIn, here's a ready-to-use post and some short variants you can copy/paste.
+
+Full post:
+
+> Built a real-time gesture-controlled demo that lets you interact with a virtual object using your webcam. I call it the Gesture-Controlled Virtual Apple — two windows (camera + apple canvas), smooth LERP animations, and a finite-state machine to keep interactions stable and jitter-free.
+>
+> How it works: open-palm, pull, and pinch gestures (detected via MediaPipe) let you attract, grab, drag, and transfer the apple between windows. The app supports two-hand workflows: drag the Apple Window with a right-hand grab, and transfer the apple with a left-hand open palm. It also snaps windows and renders the apple on your hand for a polished AR-like feel.
+>
+> Tech: Python, OpenCV, MediaPipe, NumPy. Core files: `main.py`, `hand_tracker.py`, `gesture_detector.py`, `apple_controller.py`, and the sprite in `assets/apple.png`. Run locally with a webcam: create a venv, install `opencv-python mediapipe numpy`, then `python main.py`.
+>
+> Why I built it: exploring more intuitive, spatial UIs for desktop apps — hand gestures can make interactions feel tactile without extra hardware. If you’re into CV, HCI, or playful UI prototypes, I’d love feedback or collabs.
+
+Short caption (image-ready):
+
+> Gesture-controlled desktop demo — drag, pull, and transfer a virtual apple using just your webcam. Built with Python + MediaPipe.
+
+Suggested hashtags:
+
+`#ComputerVision #HumanComputerInteraction #MediaPipe #OpenCV #Python #GestureControl`
+
+Call to action ideas:
+
+- Try it locally and share which gestures felt most natural.
+- Suggestions welcome: multi-object interactions, gesture recording, keyboard/shortcut export.
+
+Image suggestion: a screenshot of the Camera Window with the apple rendered on the palm (transfer state) or a side-by-side of both windows.
