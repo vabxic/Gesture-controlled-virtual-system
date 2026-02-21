@@ -17,7 +17,7 @@ WIN_GAP_FAR = 600                # Starting gap between windows
 WIN_GAP_MIN = 20                 # Min gap when side-by-side
 WIN_MOVE_THRESHOLD = 0.85        # Hand X (0-1) to start moving window
 WIN_MOVE_SPEED = 20              # Pixels per frame move speed
-WIN_DRAG_SENSITIVITY = 1.5        # Multiplier for dragging the window
+WIN_DRAG_SENSITIVITY = 4.0        # Multiplier for dragging the window
 
 # ─── Performance ──────────────────────────────────────────────────────────────
 TARGET_FPS = 30

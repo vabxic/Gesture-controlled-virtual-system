@@ -84,8 +84,10 @@ def main():
     prev_time  = time.perf_counter()
     frame_times: list[float] = []
     
-    # Track hand X for dragging
+    # Track hand position for dragging (both X and Y)
     prev_hand_x = 0.5
+    prev_hand_y = 0.5
+    apple_win_y = 100  # Track Y position of Apple Window
 
     # ══════════════════════════════════════════════════════════════════
     #  MAIN LOOP
@@ -108,43 +110,50 @@ def main():
             gesture = "none"
             detector.reset()
 
-        # 4. Window & Interaction Logic
+        # 4. Compute state FIRST (needed for dragging logic)
         from state_machine import AppleState
+        is_following = controller.state in (AppleState.GRABBED, AppleState.FOLLOWING)
         
-        # Check if windows are currently "snapped" (close to each other)
-        # We calculate the current distance between the right edge of camera and left edge of apple
-        # current_cam_x + cam_w vs apple_win_x
+        # Check if windows are close enough for apple transfer
         current_gap = apple_win_x - (current_cam_x + cam_w)
-        is_snapped = current_gap < (WIN_GAP_MIN + 50) # Within 50px of min gap
-        
-        # 5. Handle Window Dragging
-        # "if i grab and move my hand in left then the apple window should come closer"
-        if gesture == "grab" and hand_data:
-            dx = hand_data.palm_center[0] - prev_hand_x
-            # If moving left and windows aren't already snapped
+        is_snapped = current_gap < 100
+
+        # 5. Handle Window Dragging — move Apple Window in ANY direction
+        if gesture == "grab" and hand_data and not is_following:
             from utils import WIN_DRAG_SENSITIVITY
-            if dx < -0.005 and not is_snapped:
-                # Pull the Apple Window left
-                apple_win_x += dx * cam_w * WIN_DRAG_SENSITIVITY
-                # Ensure it doesn't cross the camera window too much
-                apple_win_x = max(current_cam_x + cam_w + WIN_GAP_MIN, apple_win_x)
-                cv2.moveWindow(APPLE_WINDOW, int(apple_win_x), 100)
+            dx = hand_data.palm_center[0] - prev_hand_x
+            dy = hand_data.palm_center[1] - prev_hand_y
+            
+            # Move window proportional to hand movement (scaled by frame size)
+            apple_win_x += dx * cam_w * WIN_DRAG_SENSITIVITY
+            apple_win_y += dy * cam_h * WIN_DRAG_SENSITIVITY
+            
+            # Keep window on screen (basic bounds)
+            apple_win_x = max(-cam_w // 2, apple_win_x)
+            apple_win_y = max(0, apple_win_y)
+            
+            if apple_window_visible:
+                cv2.moveWindow(APPLE_WINDOW, int(apple_win_x), int(apple_win_y))
         
         if hand_data:
             prev_hand_x = hand_data.palm_center[0]
+            prev_hand_y = hand_data.palm_center[1]
+
+        # Recalculate snap after potential movement
+        current_gap = apple_win_x - (current_cam_x + cam_w)
+        is_snapped = current_gap < 100
 
         # 6. Update apple controller
         # Only allow TRANSFER (grabbed/following) if windows are snapped
-        # Otherwise, "grab" used for window dragging won't "pluck" the apple yet
         effective_gesture = gesture
         is_reaching = hand_data and hand_data.palm_center[0] > WIN_MOVE_THRESHOLD
         
         if gesture == "grab" and not is_snapped:
-            effective_gesture = "none" # Don't let apple controller see the grab yet
+            effective_gesture = "none"
             
         controller.update(effective_gesture, hand_data)
 
-        # 7. Render State & Lifecycle
+        # 7. Re-read state after controller update
         is_following = controller.state in (AppleState.GRABBED, AppleState.FOLLOWING)
         
         # ── Window Lifecycle Management ──────────────────────────────
@@ -155,24 +164,9 @@ def main():
         else:
             if not apple_window_visible:
                 cv2.namedWindow(APPLE_WINDOW, cv2.WINDOW_NORMAL)
-                cv2.moveWindow(APPLE_WINDOW, int(apple_win_x), 100)
+                cv2.moveWindow(APPLE_WINDOW, int(apple_win_x), int(apple_win_y))
                 apple_window_visible = True
         
-        # ── Window Movement Logic (only if apple window exists) ──────
-        if apple_window_visible:
-            # Re-read reaching state
-            target_gap = WIN_GAP_FAR
-            if is_reaching:
-                target_gap = WIN_GAP_MIN
-                
-            理想_cam_x = apple_win_x - cam_w - target_gap
-            if current_cam_x < 理想_cam_x:
-                current_cam_x = min(理想_cam_x, current_cam_x + WIN_MOVE_SPEED)
-            elif current_cam_x > 理想_cam_x:
-                current_cam_x = max(理想_cam_x, current_cam_x - WIN_MOVE_SPEED)
-            
-            cv2.moveWindow(CAMERA_WINDOW, int(current_cam_x), 100)
-
         # 8. Render Apple Transfer
         if is_following:
             frame = renderer.render(frame, controller, debug=False)
@@ -205,7 +199,7 @@ def main():
         # Also exit if either window has been closed by the user
         if cv2.getWindowProperty(CAMERA_WINDOW, cv2.WND_PROP_VISIBLE) < 1:
             break
-        if cv2.getWindowProperty(APPLE_WINDOW, cv2.WND_PROP_VISIBLE) < 1:
+        if apple_window_visible and cv2.getWindowProperty(APPLE_WINDOW, cv2.WND_PROP_VISIBLE) < 1:
             break
 
     # ── Cleanup ───────────────────────────────────────────────────────
