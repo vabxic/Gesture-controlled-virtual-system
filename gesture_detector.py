@@ -80,6 +80,10 @@ class GestureDetector:
         if self._is_grab(hd):
             return "grab"
 
+        # 1.5 Check thumb-right with closed palm (special movement gesture)
+        if self._is_thumb_right_closed(hd):
+            return "thumb_right"
+
         # 2. Check if hand is open
         fingers_open = self._fingers_extended(hd)
         if not fingers_open:
@@ -136,3 +140,28 @@ class GestureDetector:
         w_consistent = all(d > PULL_W_DELTA_THRESHOLD for d in w_deltas)
 
         return z_consistent or w_consistent
+
+    @staticmethod
+    def _is_thumb_right_closed(hd: HandData) -> bool:
+        """Detect a mostly-closed palm with the thumb extended to the right.
+
+        This is used to signal a camera-move intent: user tucks fingers (closed)
+        and points the thumb to the right side. Thresholds are tuned for
+        normalized landmark coordinates.
+        """
+        # Allow up to one finger extended (so slightly open hands still count)
+        lm = hd.all_landmarks
+        tips = [8, 12, 16, 20]
+        mcps = [5,  9, 13, 17]
+        extended_count = 0
+        for tip_id, mcp_id in zip(tips, mcps):
+            if lm[tip_id].y < lm[mcp_id].y:
+                extended_count += 1
+        if extended_count > 1:
+            return False
+
+        # Thumb to the right of palm center by a relaxed margin for robustness
+        THUMB_RIGHT_THRESHOLD = 0.04
+        thumb_x = hd.thumb_tip[0]
+        palm_x = hd.palm_center[0]
+        return (thumb_x - palm_x) > THUMB_RIGHT_THRESHOLD

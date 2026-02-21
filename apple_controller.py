@@ -55,6 +55,17 @@ class AppleController:
 
         Drives the state machine and updates position / scale / depth.
         """
+        # Quick-transfer shortcut: external callers can pass 'transfer' to
+        # immediately give the apple to the provided hand (used for the
+        # left-hand proximity transfer UI). This bypasses the normal
+        # open/pull/grab sequence.
+        if gesture == "transfer" and hand_data is not None:
+            if self.fsm.transition(AppleState.GRABBED):
+                self.x = hand_data.palm_center[0]
+                self.y = hand_data.palm_center[1]
+            # Move straight to FOLLOWING
+            self.fsm.transition(AppleState.FOLLOWING)
+            return
         # ── Handle hand loss ──────────────────────────────────────────
         if hand_data is None:
             self._no_hand_frames += 1

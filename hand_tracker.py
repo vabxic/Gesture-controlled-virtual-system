@@ -50,7 +50,7 @@ class HandTracker:
         options = HandLandmarkerOptions(
             base_options=BaseOptions(model_asset_path=model_path),
             running_mode=VisionRunningMode.IMAGE,
-            num_hands=1,
+            num_hands=2,
             min_hand_detection_confidence=0.7,
             min_hand_presence_confidence=0.6,
         )
@@ -58,19 +58,8 @@ class HandTracker:
 
     # ── Public API ────────────────────────────────────────────────────────
 
-    def process(self, bgr_frame: np.ndarray) -> "HandData | None":
-        """Run detection and return HandData or None."""
-        rgb = bgr_frame[:, :, ::-1]
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-        
-        results = self._detector.detect(mp_image)
-
-        if not results.hand_landmarks:
-            return None
-
-        # Landmarks are normalized [0, 1]
-        lm = results.hand_landmarks[0]
-
+    def _extract_hand_data(self, lm) -> HandData:
+        """Extract HandData from a single hand's landmarks."""
         wrist      = (lm[0].x,  lm[0].y)
         thumb_tip  = (lm[4].x,  lm[4].y)
         index_tip  = (lm[8].x,  lm[8].y)
@@ -99,7 +88,46 @@ class HandTracker:
             all_landmarks=lm,
         )
 
-    def draw(self, bgr_frame: np.ndarray, hd: HandData) -> np.ndarray:
+    def process(self, bgr_frame: np.ndarray) -> "HandData | None":
+        """Run detection and return HandData for the first detected hand."""
+        rgb = bgr_frame[:, :, ::-1]
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        results = self._detector.detect(mp_image)
+
+        if not results.hand_landmarks:
+            return None
+
+        return self._extract_hand_data(results.hand_landmarks[0])
+
+    def process_two_hands(self, bgr_frame: np.ndarray) -> dict[str, HandData]:
+        """Detect up to 2 hands. Returns dict keyed by 'Left'/'Right'.
+        
+        Note: MediaPipe labels handedness from the camera's perspective,
+        but since we mirror the frame, 'Left' from MediaPipe = user's right hand.
+        We swap the labels here so they match the user's actual hands.
+        """
+        rgb = bgr_frame[:, :, ::-1]
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        results = self._detector.detect(mp_image)
+
+        hands = {}
+        if not results.hand_landmarks:
+            return hands
+
+        for i, lm in enumerate(results.hand_landmarks):
+            # Get handedness label and swap (because frame is mirrored)
+            if i < len(results.handedness):
+                label = results.handedness[i][0].category_name
+                # Swap: MediaPipe 'Left' = user's Right (mirrored frame)
+                user_label = 'Right' if label == 'Left' else 'Left'
+            else:
+                user_label = 'Right' if i == 0 else 'Left'
+            
+            hands[user_label] = self._extract_hand_data(lm)
+
+        return hands
+
+    def draw(self, bgr_frame: np.ndarray, hd: HandData, color_line=(200, 200, 200)) -> np.ndarray:
         """Custom drawing logic using standard CV2 (replacing mp_drawing)."""
         if not hd:
             return bgr_frame
@@ -107,39 +135,41 @@ class HandTracker:
         h, w = bgr_frame.shape[:2]
         lm = hd.all_landmarks
 
-        # Define connections (MediaPipe hand structure)
         connections = [
-            (0, 1), (1, 2), (2, 3), (3, 4),      # Thumb
-            (0, 5), (5, 6), (6, 7), (7, 8),      # Index
-            (9, 10), (11, 12),                   # Middle (partial)
-            (13, 14), (15, 16),                  # Ring (partial)
-            (0, 17), (17, 18), (19, 20),         # Pinky (partial)
-            (5, 9), (9, 13), (13, 17)            # Palm base
+            (0, 1), (1, 2), (2, 3), (3, 4),
+            (0, 5), (5, 6), (6, 7), (7, 8),
+            (9, 10), (10, 11), (11, 12),
+            (13, 14), (14, 15), (15, 16),
+            (0, 17), (17, 18), (18, 19), (19, 20),
+            (5, 9), (9, 13), (13, 17),
         ]
-        # Adding missing middle/ring segments for a fuller look
-        connections += [(5, 9), (9, 13), (13, 17), (9, 10), (10, 11), (13, 14), (14, 15), (17, 18), (18, 19)]
 
-        # Draw lines
         for start_idx, end_idx in connections:
             pt1 = (int(lm[start_idx].x * w), int(lm[start_idx].y * h))
             pt2 = (int(lm[end_idx].x * w), int(lm[end_idx].y * h))
-            cv2.line(bgr_frame, pt1, pt2, (200, 200, 200), 2, cv2.LINE_AA)
+            cv2.line(bgr_frame, pt1, pt2, color_line, 2, cv2.LINE_AA)
 
-        # Draw joints
         for i, point in enumerate(lm):
             px, py = int(point.x * w), int(point.y * h)
-            # Differentiate tips
             color = (0, 255, 0) if i in [4, 8, 12, 16, 20] else (60, 60, 255)
             cv2.circle(bgr_frame, (px, py), 4, color, -1, cv2.LINE_AA)
 
         return bgr_frame
 
     def process_and_draw(self, bgr_frame: np.ndarray) -> "HandData | None":
-        """Combined pass: detect and draw."""
+        """Combined pass: detect first hand and draw."""
         hd = self.process(bgr_frame)
         if hd:
             self.draw(bgr_frame, hd)
         return hd
+
+    def process_and_draw_two(self, bgr_frame: np.ndarray) -> dict[str, HandData]:
+        """Detect both hands, draw them with different colors, return dict."""
+        hands = self.process_two_hands(bgr_frame)
+        colors = {'Right': (200, 200, 200), 'Left': (200, 180, 100)}
+        for label, hd in hands.items():
+            self.draw(bgr_frame, hd, color_line=colors.get(label, (200, 200, 200)))
+        return hands
 
     def release(self):
         self._detector.close()

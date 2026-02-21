@@ -28,11 +28,11 @@ MAX_SCALE = 2.5      # Largest the apple can grow to
 DEFAULT_SCALE = 0.6  # Starting scale
 
 # ─── Gesture thresholds ──────────────────────────────────────────────────────
-GRAB_THRESHOLD = 0.06            # Normalized distance between thumb & index to count as grab
-PULL_Z_DELTA_THRESHOLD = -0.002  # Loosened
-PULL_W_DELTA_THRESHOLD = 0.002   # Palm width increase (hand approaching)
-PULL_FRAMES_REQUIRED = 3         # Reduced from 4 for responsiveness
-GESTURE_HYSTERESIS = 2           # Reduced from 3 to reduce lag
+GRAB_THRESHOLD = 0.08            # Normalized distance between thumb & index to count as grab (easier)
+PULL_Z_DELTA_THRESHOLD = -0.001  # Loosened for easier pull detection
+PULL_W_DELTA_THRESHOLD = 0.001   # Palm width increase (hand approaching)
+PULL_FRAMES_REQUIRED = 2         # Fewer frames required for pull
+GESTURE_HYSTERESIS = 1           # Report gestures faster (less stable frames needed)
 
 # ─── Smoothing ────────────────────────────────────────────────────────────────
 DEPTH_SMOOTH_WINDOW = 8          # Rolling window size for depth moving-average
